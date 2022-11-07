@@ -22,11 +22,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Create the web server
     use server::builder::ServerBuilder;
-    let server = ServerBuilder::new()
-        .port(config.port)
-        .metrics_port(config.metrics_port)
-        .build()
-        .new_server();
+    let server = ServerBuilder::new().config(config).build().new_server();
     let server = Arc::new(server);
 
     // Run the web server

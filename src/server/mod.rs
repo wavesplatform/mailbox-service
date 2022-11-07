@@ -7,7 +7,10 @@ use tokio::sync::{mpsc, oneshot};
 use warp::{ws, Filter};
 use wx_warp::{log::access, MetricsWarpBuilder};
 
-use self::websocket::{client::Clients, mailbox::MailboxManager};
+use self::{
+    config::ServiceConfig,
+    websocket::{client::Clients, mailbox::MailboxManager},
+};
 use crate::metrics::{ACTIVE_CLIENTS, ACTIVE_MAILBOXES, CLIENT_CONNECT, CLIENT_DISCONNECT, MAILBOX_CREATED, MAILBOX_DESTROYED};
 
 pub mod builder;
@@ -16,8 +19,7 @@ mod websocket;
 
 /// The web server
 pub struct Server {
-    port: u16,
-    metrics_port: u16,
+    config: ServiceConfig,
     mailbox_manager: MailboxManager,
     clients: Clients,
 }
@@ -30,8 +32,8 @@ where
     /// Returns the future that runs the web server and a sender that can be used to stop the server.
     /// The shutdown signal is propagated to each connection handler to terminate them all.
     pub fn start(self: Arc<Self>, shutdown_signal: mpsc::Sender<()>) -> (impl Future<Output = ()>, oneshot::Sender<()>) {
-        let port = self.port;
-        let metrics_port = self.metrics_port;
+        let port = self.config.port;
+        let metrics_port = self.config.metrics_port;
         let with_self = { warp::any().map(move || self.clone()) };
         let with_shutdown_signal = { warp::any().map(move || shutdown_signal.clone()) };
 
@@ -41,9 +43,7 @@ where
             .and(with_self)
             .and(with_shutdown_signal)
             .map(|ws: ws::Ws, server: Arc<Self>, shutdown_signal| {
-                let mailbox_manager = server.mailbox_manager.clone();
-                let clients = server.clients.clone();
-                ws.on_upgrade(move |socket| websocket::connection::handle_connection(socket, mailbox_manager, clients, shutdown_signal))
+                ws.on_upgrade(move |socket| websocket::connection::handle_connection(socket, server, shutdown_signal))
             })
             .with(warp::log::custom(access));
 

@@ -1,23 +1,15 @@
 //! Websocket connections management
 
-use std::iter;
+use std::{iter, sync::Arc};
 
 use futures::{SinkExt, StreamExt};
 use tokio::sync::{mpsc, oneshot};
 use warp::ws;
 
-use super::{
-    client::{Client, Clients},
-    mailbox::MailboxManager,
-};
+use super::{super::Server, client::Client};
 use crate::metrics::{ACTIVE_CLIENTS, CLIENT_CONNECT, CLIENT_DISCONNECT};
 
-pub async fn handle_connection(
-    mut socket: ws::WebSocket,
-    mailbox_manager: MailboxManager,
-    clients: Clients,
-    shutdown_signal: mpsc::Sender<()>,
-) {
+pub async fn handle_connection(mut socket: ws::WebSocket, server: Arc<Server>, shutdown_signal: mpsc::Sender<()>) {
     let (client_tx, client_rx) = mpsc::unbounded_channel();
     let (kill_tx, kill_rx) = oneshot::channel();
 
@@ -27,10 +19,10 @@ pub async fn handle_connection(
     ACTIVE_CLIENTS.inc();
     CLIENT_CONNECT.inc();
 
-    clients.add(client.clone());
+    server.clients.add(client.clone());
 
     // run ws messages processing loop
-    let run_handler = run(&mut socket, &client, client_rx, &mailbox_manager, &clients);
+    let run_handler = run(&mut socket, &client, client_rx, &server);
 
     tokio::select! {
         _ = run_handler => {}
@@ -44,9 +36,9 @@ pub async fn handle_connection(
 
     // close the associated mailbox (if any) and kick the other client connected to the same mailbox
     if let Some(mailbox_id) = client.mailbox_id() {
-        let to_kill = mailbox_manager.close_mailbox(mailbox_id, client.id);
+        let to_kill = server.mailbox_manager.close_mailbox(mailbox_id, client.id);
         for target_id in to_kill {
-            if let Some(target) = clients.find(target_id) {
+            if let Some(target) = server.clients.find(target_id) {
                 log::trace!("forcibly killing {:?} because {:?} is being destroyed", target_id, mailbox_id);
                 target.kill();
             }
@@ -56,7 +48,7 @@ pub async fn handle_connection(
     // handle connection close
     finalize_connection(socket).await;
 
-    clients.remove(client.id);
+    server.clients.remove(client.id);
 
     ACTIVE_CLIENTS.dec();
     CLIENT_DISCONNECT.inc();
@@ -64,13 +56,7 @@ pub async fn handle_connection(
     log::info!("{:?} disconnected", client.id);
 }
 
-async fn run(
-    socket: &mut ws::WebSocket,
-    client: &Client,
-    mut client_rx: mpsc::UnboundedReceiver<ws::Message>,
-    mailbox_manager: &MailboxManager,
-    clients: &Clients,
-) {
+async fn run(socket: &mut ws::WebSocket, client: &Client, mut client_rx: mpsc::UnboundedReceiver<ws::Message>, server: &Server) {
     loop {
         tokio::select! {
             // Incoming message (from ws)
@@ -93,7 +79,7 @@ async fn run(
                         continue;
                     }
 
-                    if let Err(failed_msg) = handle_incoming_message(client, msg, mailbox_manager, &clients) {
+                    if let Err(failed_msg) = handle_incoming_message(client, msg, server) {
                         log::trace!("Error processing {:?} message: {:?}", client.id, failed_msg);
                         log::debug!("Error occurred while sending message to {:?}", client.id);
                         break;
@@ -119,16 +105,11 @@ async fn run(
 
 /// Handle incoming message for the given client.
 /// Returns the same message in case of errors (when the message is not processed).
-fn handle_incoming_message(
-    client: &Client,
-    msg: ws::Message,
-    mailbox_manager: &MailboxManager,
-    clients: &Clients,
-) -> Result<(), ws::Message> {
+fn handle_incoming_message(client: &Client, msg: ws::Message, server: &Server) -> Result<(), ws::Message> {
     if let Some(mailbox_id) = client.mailbox_id() {
-        let immediate_send = mailbox_manager.send_to_mailbox(mailbox_id, client.id, msg);
+        let immediate_send = server.mailbox_manager.send_to_mailbox(mailbox_id, client.id, msg);
         if let Some((client_id, msg)) = immediate_send {
-            if let Some(client) = clients.find(client_id) {
+            if let Some(client) = server.clients.find(client_id) {
                 let sent = client.send_message(msg);
                 if !sent {
                     log::debug!("Send message to {:?} failed - disconnected early?", client_id);
@@ -144,22 +125,25 @@ fn handle_incoming_message(
     } else {
         let (reply_message, pending_messages) = match initial_message::Request::parse(&msg) {
             Ok(initial_message::Request::CreateMailbox) => {
-                let mailbox_id = mailbox_manager.create_mailbox();
+                let mailbox_id = server.mailbox_manager.create_mailbox();
                 client.set_mailbox_id(mailbox_id);
-                mailbox_manager.attach_client(mailbox_id, client.id).expect("new mailbox failed");
+                server
+                    .mailbox_manager
+                    .attach_client(mailbox_id, client.id)
+                    .expect("new mailbox failed");
                 log::debug!("{:?} has created {:?}", client.id, mailbox_id);
                 let reply = initial_message::Reply::Created { id: mailbox_id.raw() };
                 (reply, None)
             }
-            Ok(initial_message::Request::ConnectToMailbox { id }) => match mailbox_manager.find_mailbox(id) {
+            Ok(initial_message::Request::ConnectToMailbox { id }) => match server.mailbox_manager.find_mailbox(id) {
                 Ok(mailbox_id) => {
                     client.set_mailbox_id(mailbox_id);
-                    match mailbox_manager.attach_client(mailbox_id, client.id) {
+                    match server.mailbox_manager.attach_client(mailbox_id, client.id) {
                         Ok(()) => log::debug!("{:?} has connected to {:?}", client.id, mailbox_id),
                         Err(err) => log::debug!("{:?} has failed to connect to mailbox: {:?}", client.id, err),
                     }
                     let reply = initial_message::Reply::Connected { id: mailbox_id.raw() };
-                    let pending = mailbox_manager.pending_messages_for_client(mailbox_id, client.id);
+                    let pending = server.mailbox_manager.pending_messages_for_client(mailbox_id, client.id);
                     (reply, Some(pending))
                 }
                 Err(err) => {
