@@ -715,6 +715,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "mailbox-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "builder-pattern",
+ "env_logger",
+ "envy",
+ "futures",
+ "itertools",
+ "lazy_static",
+ "parking_lot",
+ "prometheus",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "warp",
+ "wavesexchange_log 0.5.1 (git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_log/0.5.1)",
+ "wavesexchange_warp",
+]
+
+[[package]]
 name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1053,28 +1075,6 @@ name = "safemem"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
-
-[[package]]
-name = "safesync-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "builder-pattern",
- "env_logger",
- "envy",
- "futures",
- "itertools",
- "lazy_static",
- "parking_lot",
- "prometheus",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "warp",
- "wavesexchange_log 0.5.1 (git+https://github.com/waves-exchange/wavesexchange-rs?tag=wavesexchange_log/0.5.1)",
- "wavesexchange_warp",
-]
 
 [[package]]
 name = "scoped-tls"

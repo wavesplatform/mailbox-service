@@ -1,5 +1,5 @@
 [package]
-name = "safesync-server"
+name = "mailbox-server"
 version = "0.1.0"
 authors = ["Alex Kordys <akordys@uniqsoft.ae>"]
 edition = "2021"
