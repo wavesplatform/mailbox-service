@@ -8,7 +8,7 @@ use warp::{ws, Filter};
 use wx_warp::{log::access, MetricsWarpBuilder};
 
 use self::websocket::{client::Clients, mailbox::MailboxManager};
-use crate::metrics::{ACTIVE_CLIENTS, CLIENT_CONNECT, CLIENT_DISCONNECT};
+use crate::metrics::{ACTIVE_CLIENTS, ACTIVE_MAILBOXES, CLIENT_CONNECT, CLIENT_DISCONNECT, MAILBOX_CREATED, MAILBOX_DESTROYED};
 
 pub mod builder;
 pub mod config;
@@ -57,6 +57,9 @@ where
             .with_metric(&*ACTIVE_CLIENTS)
             .with_metric(&*CLIENT_CONNECT)
             .with_metric(&*CLIENT_DISCONNECT)
+            .with_metric(&*ACTIVE_MAILBOXES)
+            .with_metric(&*MAILBOX_CREATED)
+            .with_metric(&*MAILBOX_DESTROYED)
             .with_graceful_shutdown(async {
                 let _ = stop_rx.await;
                 log::trace!("server shutdown signal received");

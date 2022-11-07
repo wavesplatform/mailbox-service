@@ -9,6 +9,7 @@ use parking_lot::{Mutex, RwLock};
 use warp::ws;
 
 use super::client::ClientId;
+use crate::metrics::{ACTIVE_MAILBOXES, MAILBOX_CREATED, MAILBOX_DESTROYED};
 
 /// Mailbox ID is a 30-bit unsigned integer
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
@@ -35,6 +36,8 @@ impl MailboxManager {
         debug_assert!(!mailboxes.contains_key(&id));
         mailboxes.insert(id, Mailbox::default());
         log::trace!("{:?} created", id);
+        ACTIVE_MAILBOXES.inc();
+        MAILBOX_CREATED.inc();
         id
     }
 
@@ -107,6 +110,8 @@ impl MailboxManager {
             ids.dispose_id(mailbox_id);
             let unsent_messages = removed.peers[0].pending_messages.len() + removed.peers[1].pending_messages.len();
             log::trace!("{:?} destroyed ({} unsent messages)", mailbox_id, unsent_messages);
+            ACTIVE_MAILBOXES.dec();
+            MAILBOX_DESTROYED.inc();
             Vec::default()
         }
     }
