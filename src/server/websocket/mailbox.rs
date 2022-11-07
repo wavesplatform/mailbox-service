@@ -1,7 +1,7 @@
 //! Mailbox management
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     sync::Arc,
 };
 
@@ -103,9 +103,10 @@ impl MailboxManager {
         if mailbox.has_connected_peers() {
             mailbox.connected_peers()
         } else {
-            mailboxes.remove(&mailbox_id);
+            let removed = mailboxes.remove(&mailbox_id).expect("mailbox");
             ids.dispose_id(mailbox_id);
-            log::trace!("{:?} destroyed", mailbox_id);
+            let unsent_messages = removed.peers[0].pending_messages.len() + removed.peers[1].pending_messages.len();
+            log::trace!("{:?} destroyed ({} unsent messages)", mailbox_id, unsent_messages);
             Vec::default()
         }
     }
@@ -114,10 +115,25 @@ impl MailboxManager {
 /// Private API, manages mailbox IDs, ensures uniqueness
 #[derive(Default)]
 struct IdManager {
+    /// IDs that are currently in use
     used_ids: HashSet<MailboxId>,
+    /// MRU list of IDs that are not in use now but have been used recently,
+    /// so we don't want them to reappear too soon
+    recently_used_mru: VecDeque<MailboxId>,
+    recently_used: HashSet<MailboxId>,
 }
 
 impl IdManager {
+    /// Generate new random 30-bit ID
+    #[cfg(not(debug_assertions))]
+    fn random_id() -> MailboxId {
+        let id = rand::random::<u32>();
+        let id = id & 0x3FFFFFFF; // cut 30 bits
+        MailboxId(id)
+    }
+
+    /// Debug build uses sequential IDs for the sake of debugging simplicity
+    #[cfg(debug_assertions)]
     fn random_id() -> MailboxId {
         use std::sync::atomic::{AtomicU32, Ordering};
         static COUNTER: AtomicU32 = AtomicU32::new(1000001);
@@ -130,19 +146,32 @@ impl IdManager {
     pub fn create_id(&mut self) -> MailboxId {
         let id = loop {
             let id = Self::random_id();
-            if !self.used_ids.contains(&id) {
-                break id;
+            if self.used_ids.contains(&id) {
+                continue;
             }
+            if self.recently_used.contains(&id) {
+                continue;
+            }
+            break id;
         };
         debug_assert!(!self.used_ids.contains(&id));
         self.used_ids.insert(id);
         id
     }
 
+    const MAX_RECENT_IDS: usize = 100_000;
+
     /// Remove existing mailbox id
     pub fn dispose_id(&mut self, id: MailboxId) {
         debug_assert!(self.used_ids.contains(&id));
         self.used_ids.remove(&id);
+        self.recently_used.insert(id);
+        self.recently_used_mru.push_front(id);
+        while self.recently_used_mru.len() > Self::MAX_RECENT_IDS {
+            let removed = self.recently_used_mru.pop_back().expect("mru id");
+            debug_assert!(self.recently_used.contains(&removed));
+            self.recently_used.remove(&removed);
+        }
     }
 
     /// Checks if specified ID exists
