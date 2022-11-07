@@ -10,12 +10,11 @@ RUN cargo install --path .
 
 
 FROM debian:11 as runtime
-WORKDIR /usr/www/app
+WORKDIR /app
 
 RUN apt-get update && apt-get install -y curl openssl libssl-dev libpq-dev procps net-tools curl
-# RUN curl -ks 'https://cert.host.server/ssl_certs/EnterpriseRootCA.crt' -o '/usr/local/share/ca-certificates/EnterpriseRootCA.crt'
 RUN /usr/sbin/update-ca-certificates
 
-COPY --from=builder /usr/local/cargo/bin/service .
+COPY --from=builder /usr/local/cargo/bin/maillbox-server .
 
-CMD ["./service"]
+CMD ["./maillbox-server"]
