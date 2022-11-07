@@ -1,0 +1,15 @@
+include:
+  - project: 'we-private/backend/common-ci'
+    ref: ci
+    file: 'ci-functions/build_image.yml'
+  - project: 'we-private/backend/common-ci'
+    ref: ci
+    file: 'ci-functions/deploy_stages.yml'
+
+variables:
+  APP_NAME: mailbox-service
+  CHART_LIST: "mailbox-service" 
+
+stages:
+  - "Build docker image"
+  - "Deploy to stage/test/dev"
