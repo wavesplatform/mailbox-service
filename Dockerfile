@@ -15,6 +15,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y curl openssl libssl-dev libpq-dev procps net-tools curl
 RUN /usr/sbin/update-ca-certificates
 
-COPY --from=builder /usr/local/cargo/bin/maillbox-server .
+COPY --from=builder /usr/local/cargo/bin/mailbox-server .
 
-CMD ["./maillbox-server"]
+CMD ["./mailbox-server"]
