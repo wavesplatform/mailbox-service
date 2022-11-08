@@ -125,6 +125,13 @@ fn handle_incoming_message(client: &Client, msg: ws::Message, server: &Server) -
     } else {
         let (reply_message, pending_messages) = match initial_message::Request::parse(&msg) {
             Ok(initial_message::Request::CreateMailbox) => {
+                let max_active_mailboxes = server.config.max_open_mailboxes;
+                let active_mailboxes = server.mailbox_manager.active_mailboxes();
+                if active_mailboxes >= max_active_mailboxes {
+                    log::warn!("Number of active mailboxes has reached maximum: {}", max_active_mailboxes);
+                    log::debug!("{:?} has been killed due to an attempt to create mailbox over the limit", client.id);
+                    return Err(msg);
+                }
                 let mailbox_id = server.mailbox_manager.create_mailbox();
                 client.set_mailbox_id(mailbox_id);
                 server

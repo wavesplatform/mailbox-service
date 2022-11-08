@@ -2,10 +2,11 @@
 
 ## Configs (environment vars)
 
-    RUST_LOG=debug,hyper=warn,mio=warn,tracing=warn,tokio_tungstenite=warn,tungstenite=warn,warp=warn
-    RUST_LOG_FORMAT=json
-    PORT=8080
-    METRICS_PORT=9090
+    RUST_LOG = debug,hyper=warn,mio=warn,tracing=warn,tokio_tungstenite=warn,tungstenite=warn,warp=warn
+    RUST_LOG_FORMAT = json
+    PORT = 8080
+    METRICS_PORT = 9090
+    MAX_OPEN_MAILBOXES = 100000000 # default 100M
 
 ## Websocket service
 

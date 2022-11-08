@@ -115,6 +115,14 @@ impl MailboxManager {
             Vec::default()
         }
     }
+
+    /// Returns number of currently active mailboxes
+    pub fn active_mailboxes(&self) -> u32 {
+        let ids = self.ids.read();
+        let count = ids.count();
+        assert!(count <= u32::MAX as usize);
+        count as u32
+    }
 }
 
 /// Private API, manages mailbox IDs, ensures uniqueness
@@ -182,6 +190,11 @@ impl IdManager {
     /// Checks if specified ID exists
     pub fn id_exists(&self, id: MailboxId) -> bool {
         self.used_ids.contains(&id)
+    }
+
+    /// Returns number of IDs currently in use
+    pub fn count(&self) -> usize {
+        self.used_ids.len()
     }
 }
 
