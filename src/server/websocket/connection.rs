@@ -3,7 +3,10 @@
 use std::{iter, sync::Arc};
 
 use futures::{SinkExt, StreamExt};
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    sync::{mpsc, oneshot},
+    time,
+};
 use warp::ws;
 
 use super::{super::Server, client::Client};
@@ -58,10 +61,14 @@ pub async fn handle_connection(mut socket: ws::WebSocket, server: Arc<Server>, s
 
 async fn run(socket: &mut ws::WebSocket, client: &Client, mut client_rx: mpsc::UnboundedReceiver<ws::Message>, server: &Server) {
     loop {
+        let timeout_deadline = client.last_activity() + server.config.mailbox_timeout;
+        let timeout = time::sleep_until(timeout_deadline);
         tokio::select! {
             // Incoming message (from ws)
             next_message = socket.next() => {
                 if let Some(next_msg_result) = next_message {
+                    client.update_last_activity();
+
                     let msg = match next_msg_result {
                         Ok(msg) => msg,
                         Err(disconnected_err) => {
@@ -90,6 +97,7 @@ async fn run(socket: &mut ws::WebSocket, client: &Client, mut client_rx: mpsc::U
             // Outgoing message
             msg = client_rx.recv() => {
                 if let Some(message) = msg {
+                    client.update_last_activity();
                     log::debug!("Sending message to {:?}", client.id);
                     if let Err(err) = socket.send(message).await {
                         log::debug!("Error while sending to {:?}: {:?}", client.id, err);
@@ -98,6 +106,17 @@ async fn run(socket: &mut ws::WebSocket, client: &Client, mut client_rx: mpsc::U
                 } else {
                     break;
                 }
+            }
+
+            _ = timeout => {
+                log::debug!(
+                    "Timeout ({:?}) occurred for {:?}: dropping mailbox {:?}",
+                    server.config.mailbox_timeout,
+                    client.id,
+                    client.mailbox_id(),
+                );
+                client.kill();
+                break;
             }
         }
     }

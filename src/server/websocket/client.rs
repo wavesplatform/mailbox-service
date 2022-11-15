@@ -3,7 +3,10 @@
 use std::{collections::HashMap, sync::Arc};
 
 use parking_lot::Mutex;
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    sync::{mpsc, oneshot},
+    time::Instant,
+};
 use warp::ws;
 
 use super::mailbox::MailboxId;
@@ -23,6 +26,7 @@ struct ClientInner {
     sender: mpsc::UnboundedSender<ws::Message>,
     kill_sender: Option<oneshot::Sender<()>>,
     mailbox_id: Option<MailboxId>,
+    last_activity: Instant,
 }
 
 impl Client {
@@ -37,6 +41,7 @@ impl Client {
             sender,
             kill_sender: Some(kill_sender),
             mailbox_id: None,
+            last_activity: Instant::now(),
         }));
         Client { id, inner }
     }
@@ -52,6 +57,14 @@ impl Client {
     pub fn send_message(&self, msg: ws::Message) -> bool {
         let res = self.inner.lock().sender.send(msg);
         res.is_ok()
+    }
+
+    pub fn update_last_activity(&self) {
+        self.inner.lock().last_activity = Instant::now();
+    }
+
+    pub fn last_activity(&self) -> Instant {
+        self.inner.lock().last_activity
     }
 
     pub fn kill(&self) {

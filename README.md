@@ -7,6 +7,7 @@
     PORT = 8080
     METRICS_PORT = 9090
     MAX_OPEN_MAILBOXES = 100000000 # default 100M
+    MAILBOX_TIMEOUT_SEC = 60 # default 60 seconds
 
 ## Websocket service
 
@@ -23,6 +24,8 @@ a silent connection drop made by the server.
 
 In particular, if the other side (the second client connected to the same mailbox) disconnects
 (due to an error, or deliberately), the first client will also be disconnected by the server.
+
+A timeout is applied to all mailboxes: `MAILBOX_TIMEOUT_SEC` seconds since last activity.
 
 ### Create mailbox message
 
