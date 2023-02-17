@@ -1,13 +1,13 @@
 [package]
 name = "mailbox-server"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Alex Kordys <akordys@uniqsoft.ae>"]
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
 builder-pattern = "0.4"
-env_logger = "0.9"
+env_logger = "0.10"
 envy = "0.4"
 futures = "0.3"
 itertools = "0.10"
@@ -21,4 +21,4 @@ thiserror = "1.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 warp = "0.3"
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
-wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.3" }
+wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.5" }
