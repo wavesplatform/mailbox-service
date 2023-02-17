@@ -326,7 +326,7 @@ impl Peer {
     /// Take enqueued messages
     #[must_use]
     pub fn take_pending_messages(&mut self) -> Vec<ws::Message> {
-        std::mem::replace(&mut self.pending_messages, Vec::new())
+        std::mem::take(&mut self.pending_messages)
     }
 }
 

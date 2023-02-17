@@ -241,7 +241,7 @@ mod initial_message {
     impl Reply {
         pub(super) fn format(self) -> ws::Message {
             let json = serde_json::to_string(&self).expect("format json failed");
-            ws::Message::text(&json)
+            ws::Message::text(json)
         }
     }
 
